@@ -57,7 +57,7 @@ nav button.active{background:#E5F3EA;color:#176B45;font-weight:750}
   const app = document.querySelector("#app"), notice = document.querySelector("#notice");
   const blank = () => ({jobs:[], income:[]});
   let data = blank(), tab = "Quote", period = "This month", quoteResult = null;
-  let quoteDraft = {name:"",hours:"",rate:"",materials:"",transport:""}, payOpen = null, addOpen = false;
+  let quoteDraft = {name:"",hours:"",rate:"",materials:"",transport:"",otherCosts:""}, payOpen = null, addOpen = false;
   try {
     const saved = JSON.parse(localStorage.getItem(KEY));
     if (saved && Array.isArray(saved.jobs) && Array.isArray(saved.income)) data = saved;
@@ -84,16 +84,27 @@ nav button.active{background:#E5F3EA;color:#176B45;font-weight:750}
   function field(label,id,value,type="text",attrs="") {
     return `<label for="${id}">${label}</label><input id="${id}" name="${id}" type="${type}" value="${esc(value)}" ${attrs}>`;
   }
+  function quoteNumbers(d) {
+    const h=Number(d.hours), rate=asCents(d.rate), mat=costsCents(d.materials), trans=costsCents(d.transport), other=costsCents(d.otherCosts);
+    const valid=h>0 && Number.isFinite(h) && rate>0 && mat!==null && mat>=0 && trans!==null && trans>=0 && other!==null && other>=0;
+    const labour=valid?Math.round(h*rate):0, costs=valid?mat+trans+other:0;
+    return {valid,labour,costs,total:labour+costs};
+  }
+  function breakdown(d) {
+    const n=quoteNumbers(d);
+    return `<p><span>Labour</span><strong>${money(n.labour)}</strong></p><p><span>Job costs</span><strong>${money(n.costs)}</strong></p><p><span>Suggested quote</span><strong>${money(n.total)}</strong></p>
+      <p style="display:block">This covers ${money(n.costs)} in costs and leaves you ${money(n.labour)} for your time.</p>
+      ${n.costs>0?`<p class="error" style="display:block">Charge below ${money(n.costs)} and you’ll lose money.</p>`:""}`;
+  }
   function renderQuote() {
     if (quoteResult) {
       const j=quoteResult, msg=`Hi! My quote for ${j.name} is ${money(j.quoted)}. Please let me know if you’d like to go ahead.`;
-      return `<h1>Quote</h1><section class="card pale"><h2>Suggested quote</h2><p class="big">${money(j.quoted)}</p><p>${esc(j.name)}</p></section>
+      const costs=j.materials+j.transport+(j.otherCosts||0);
+      return `<h1>Quote</h1><section class="card pale"><h2>Suggested quote</h2><p class="big">${money(j.quoted)}</p><p>${esc(j.name)}</p><p>This covers ${money(costs)} in costs and leaves you ${money(j.labour)} for your time.</p>${costs>0?`<p class="error">Charge below ${money(costs)} and you’ll lose money.</p>`:""}</section>
         <section class="card"><label for="quote-message">WhatsApp message</label><textarea id="quote-message" readonly>${esc(msg)}</textarea>
         <button class="primary" data-action="copy">Copy WhatsApp message</button><button class="secondary" data-action="new-quote" style="width:100%;margin-top:10px">New quote</button></section>`;
     }
-    const d=quoteDraft, h=Number(d.hours), rate=asCents(d.rate), mat=costsCents(d.materials), trans=costsCents(d.transport);
-    const valid=h>0 && Number.isFinite(h) && rate>0 && mat!==null && mat>=0 && trans!==null && trans>=0;
-    const labour=valid?Math.round(h*rate):0, costs=valid?mat+trans:0, total=labour+costs;
+    const d=quoteDraft;
     return `<h1>Quote</h1><form id="quote-form" class="card">
       ${field("Job name","q-name",d.name)}
       ${field("Estimated hours","q-hours",d.hours,"number",'min="0.01" step="any" inputmode="decimal"')}
@@ -101,7 +112,8 @@ nav button.active{background:#E5F3EA;color:#176B45;font-weight:750}
       <small>What you want to earn per hour</small>
       ${field("Materials (R)","q-materials",d.materials,"number",'min="0" step="0.01" inputmode="decimal"')}
       ${field("Transport (R)","q-transport",d.transport,"number",'min="0" step="0.01" inputmode="decimal"')}
-      <div class="card breakdown"><p><span>Labour</span><strong>${money(labour)}</strong></p><p><span>Job costs</span><strong>${money(costs)}</strong></p><p><span>Suggested quote</span><strong>${money(total)}</strong></p></div>
+      ${field("Other costs (R)","q-other-costs",d.otherCosts,"number",'min="0" step="0.01" inputmode="decimal"')}
+      <div id="quote-breakdown" class="card breakdown">${breakdown(d)}</div>
       <button class="primary">Generate quote</button></form>`;
   }
   function renderJobs() {
@@ -117,7 +129,7 @@ nav button.active{background:#E5F3EA;color:#176B45;font-weight:750}
     }).join("")}`;
   }
   function paymentForm(j) {
-    return `<form class="payment-form"><h2>Record payment</h2>${field("Amount received","pay-amount",((j.quoted/100).toFixed(2)),"number",'min="0.01" step="0.01" inputmode="decimal"')}
+    return `<form class="payment-form"><h2>Record payment</h2>${field("Amount received","pay-amount",(j.quoted/100).toFixed(2),"number",'min="0.01" step="0.01" inputmode="decimal"')}
       ${field("Payment date","pay-date",today(),"date")}<button class="primary">Save payment</button></form>`;
   }
   function range() {
@@ -131,7 +143,7 @@ nav button.active{background:#E5F3EA;color:#176B45;font-weight:750}
   function renderEarnings() {
     const [start,end]=range();
     const payments=[
-      ...data.jobs.filter(j=>j.payment).map(j=>({date:j.payment.date,amount:j.payment.amount,cost:j.materials+j.transport})),
+      ...data.jobs.filter(j=>j.payment).map(j=>({date:j.payment.date,amount:j.payment.amount,cost:j.materials+j.transport+(j.otherCosts||0)})),
       ...data.income.map(i=>({date:i.date,amount:i.amount,cost:i.costs}))
     ].filter(x=>x.date>=start&&x.date<=end);
     const received=payments.reduce((s,x)=>s+x.amount,0), costs=payments.reduce((s,x)=>s+x.cost,0);
@@ -162,14 +174,18 @@ nav button.active{background:#E5F3EA;color:#176B45;font-weight:750}
     const b=e.target.closest("[data-tab]"); if(b){tab=b.dataset.tab;render();}
   });
   app.addEventListener("input",e=>{
-    const ids={"q-name":"name","q-hours":"hours","q-rate":"rate","q-materials":"materials","q-transport":"transport"};
-    if(ids[e.target.id]){quoteDraft[ids[e.target.id]]=e.target.value;render();}
+    const ids={"q-name":"name","q-hours":"hours","q-rate":"rate","q-materials":"materials","q-transport":"transport","q-other-costs":"otherCosts"};
+    if(ids[e.target.id]){
+      quoteDraft[ids[e.target.id]]=e.target.value;
+      const box=document.querySelector("#quote-breakdown");
+      if(box) box.innerHTML=breakdown(quoteDraft);
+    }
   });
   app.addEventListener("click",async e=>{
     const b=e.target.closest("[data-action],[data-period]"); if(!b)return;
     if(b.dataset.period){period=b.dataset.period;render();return;}
     const card=b.closest("[data-job]"), id=card?.dataset.job, j=data.jobs.find(x=>x.id===id);
-    if(b.dataset.action==="new-quote"){quoteResult=null;quoteDraft={name:"",hours:"",rate:"",materials:"",transport:""};say("");render();}
+    if(b.dataset.action==="new-quote"){quoteResult=null;quoteDraft={name:"",hours:"",rate:"",materials:"",transport:"",otherCosts:""};say("");render();}
     if(b.dataset.action==="copy"){
       const box=app.querySelector("#quote-message");
       try {if(!navigator.clipboard) throw 0; await navigator.clipboard.writeText(box.value);say("Copied");}
@@ -186,10 +202,10 @@ nav button.active{background:#E5F3EA;color:#176B45;font-weight:750}
   app.addEventListener("submit",e=>{
     e.preventDefault();
     if(e.target.id==="quote-form"){
-      const d=quoteDraft, hours=Number(d.hours), rate=asCents(d.rate), materials=costsCents(d.materials), transport=costsCents(d.transport);
-      if(!d.name.trim()||!Number.isFinite(hours)||hours<=0||rate===null||rate<=0||materials===null||materials<0||transport===null||transport<0){say("Check the job name, hours, rate, and costs.",true);return;}
-      const labour=Math.round(hours*rate), quoted=labour+materials+transport;
-      const job={id:crypto.randomUUID?.()||String(Date.now()),created:Date.now(),name:d.name.trim(),labour,materials,transport,quoted,status:"Awaiting acceptance",payment:null};
+      const d=quoteDraft, n=quoteNumbers(d);
+      if(!d.name.trim()||!n.valid){say("Check the job name, hours, rate, and costs.",true);return;}
+      const materials=costsCents(d.materials), transport=costsCents(d.transport), otherCosts=costsCents(d.otherCosts);
+      const job={id:crypto.randomUUID?.()||String(Date.now()),created:Date.now(),name:d.name.trim(),labour:n.labour,materials,transport,otherCosts,quoted:n.total,status:"Awaiting acceptance",payment:null};
       const next=JSON.parse(JSON.stringify(data));next.jobs.push(job);
       commit(next,()=>{quoteResult=job;say("");render();});
     }
