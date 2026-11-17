@@ -2,7 +2,7 @@
 
 ## The problem
 
-Gardeners, cleaners, home helpers, and other part-time or independent workers in South Africa often agree on prices in person or over WhatsApp. It’s easy to overlook expenses like materials and taxi fare when deciding what to charge. Writing a clear quote can also take time, especially when English is an additional language. When payments and expenses are scattered across messages, it’s hard to know what customers paid, what the work cost, and how much you took home.
+Gardeners, cleaners, home helpers, and other part-time or independent workers in Africa often agree on prices in person or over WhatsApp. It’s easy to overlook expenses like materials and taxi fare when deciding what to charge. Writing a clear quote can also take time, especially when English is an additional language. When payments and expenses are scattered across messages, it’s hard to know what customers paid, what the work cost, and how much you took home.
 
 KasiQuote helps workers price a job and prepare a plain-English quote they can send on WhatsApp. It also helps them manage their finances by showing how much customers paid each month, how much they spent on jobs, and what they actually took home. That gives them a clearer picture of what they have available to spend or save. The programme can be used offline in case they are in an area with no signal. 
 
